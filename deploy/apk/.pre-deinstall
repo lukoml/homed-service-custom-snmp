@@ -1,0 +1,6 @@
+#!/bin/sh
+
+/etc/init.d/homed-custom-snmp stop
+/etc/init.d/homed-custom-snmp disable
+
+exit 0

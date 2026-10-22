@@ -1,0 +1,4 @@
+name = homed-custom-snmp
+description = HOMEd Custom-SNMP Service
+maintainer = u236 <mail@u236.org>
+depends = homed-qt snmp-utils

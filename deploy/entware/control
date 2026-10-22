@@ -1,0 +1,8 @@
+Package: homed-custom-snmp
+Version:
+Architecture:
+Maintainer: u236 <mail@u236.org>
+Depends: homed-qt, snmp-utils
+Section: misc
+Priority: standard
+Description: HOMEd Custom-SNMP Service

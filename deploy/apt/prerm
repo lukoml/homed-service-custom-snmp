@@ -1,0 +1,6 @@
+#!/bin/bash
+
+systemctl stop homed-custom-snmp.service
+systemctl disable homed-custom-snmp.service
+
+exit 0
