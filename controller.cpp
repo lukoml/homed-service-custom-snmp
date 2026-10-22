@@ -3,33 +3,52 @@
 
 Controller::Controller(const QString &configFile) : HOMEd(SERVICE_VERSION, configFile, true), m_timer(new QTimer(this)), m_status(false), m_names(false)
 {
+    QFile file(getConfig()->value("snmp/custom", "/opt/homed-custom-snmp/custom.json").toString());
     QList <QString> names = getConfig()->childGroups();
     QString instance = serviceTopic().split('/').value(1);
     QProcess process;
+    QJsonArray custom;
 
+    m_topic = instance.isEmpty() ? "custom" : QString("custom/%1").arg(instance);
     process.start("sh", {"-c", "command -v snmpget snmpwalk"});
     process.waitForFinished();
 
     if (process.exitCode())
         return;
 
-    m_topic = instance.isEmpty() ? "custom" : QString("custom/%1").arg(instance);
+    if (file.open(QFile::ReadOnly))
+    {
+        custom = QJsonDocument::fromJson(file.readAll()).array();
+        file.close();
+    }
 
     for (int i = 0; i < names.count(); i++)
     {
         const QString &name = names.at(i);
 
-        if (name != "log" && name != "mqtt")
+        if (name != "log" && name != "mqtt" && name != "snmp")
         {
-            QString address = getConfig()->value(QString("%1/address").arg(name)).toString(), community = getConfig()->value(QString("%1/community").arg(name), "public").toString(), ports = getConfig()->value(QString("%1/ports").arg(name)).toStringList().join(',');
+            QString address = getConfig()->value(QString("%1/address").arg(name)).toString(), community = getConfig()->value(QString("%1/community").arg(name), "public").toString(), disks = getConfig()->value(QString("%1/disks").arg(name)).toStringList().join(','), ports = getConfig()->value(QString("%1/ports").arg(name)).toStringList().join(',');
             quint32 interval = getConfig()->value(QString("%1/interval").arg(name), DEFAULT_INTERVAL).toInt();
             bool debug = getConfig()->value(QString("%1/debug").arg(name), false).toBool();
+            QMap <QString, QVariant> items, options;
             Device device;
 
             if (address.isEmpty())
                 continue;
 
-            device = Device(new DeviceObject(address, community, ports, interval, QString("snmp-%1").arg(name), debug));
+            for (auto it = custom.begin(); it != custom.end(); it++)
+            {
+                QJsonObject json = it->toObject();
+
+                if (!json.value("devices").toArray().contains(name))
+                    continue;
+
+                items.insert(json.value("items").toObject().toVariantMap());
+                options.insert(json.value("options").toObject().toVariantMap());
+            }
+
+            device = Device(new DeviceObject(address, community, disks, ports, items, options, interval, QString("snmp-%1").arg(name), debug));
 
             connect(device.data(), &DeviceObject::deviceUpdated, this, &Controller::deviceUpdated);
             connect(device.data(), &DeviceObject::availabilityUpdated, this, &Controller::availabilityUpdated);
@@ -59,9 +78,7 @@ void Controller::publishDevice(DeviceObject *device)
 
 void Controller::publishAvailability(DeviceObject *device)
 {
-    QString status = device->availability() == Availability::Online ? "online" : "offline";
-    mqttPublish(mqttTopic("device/%1/%2").arg(m_topic, m_names ? device->name() : device->id()), {{"status", status}}, true);
-    logInfo << device << "is" << status;
+    mqttPublish(mqttTopic("device/%1/%2").arg(m_topic, m_names ? device->name() : device->id()), {{"status", device->availability() == Availability::Online ? "online" : "offline"}}, true);
 }
 
 void Controller::quit(void)
@@ -178,10 +195,14 @@ void Controller::deviceUpdated(void)
 
 void Controller::availabilityUpdated(void)
 {
+    DeviceObject *device = reinterpret_cast <DeviceObject*> (sender());
+
+    logInfo << device << "is" << (device->availability() == Availability::Online ? "online" : "offline");
+
     if (!m_status)
         return;
 
-    publishAvailability(reinterpret_cast <DeviceObject*> (sender()));
+    publishAvailability(device);
 }
 
 void Controller::propertiesUpdated(void)
