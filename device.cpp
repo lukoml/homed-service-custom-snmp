@@ -47,7 +47,7 @@ QJsonObject DeviceObject::options(void)
 void DeviceObject::poll(void)
 {
     m_index = 0;
-    m_pollTime = QDateTime::currentMSecsSinceEpoch();
+    m_pollTime = QDateTime::currentSecsSinceEpoch();
     m_polling = true;
 
     if (m_discovery)

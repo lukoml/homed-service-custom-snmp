@@ -59,7 +59,7 @@ Controller::Controller(const QString &configFile) : HOMEd(SERVICE_VERSION, confi
     }
 
     connect(m_timer, &QTimer::timeout, this, &Controller::update);
-    m_timer->start(1);
+    m_timer->start(1000);
 }
 
 void Controller::publishDevice(DeviceObject *device)
@@ -217,7 +217,7 @@ void Controller::update(void)
     {
         const Device &device = m_devices.at(i);
 
-        if (device->polling() || device->pollTime() + device->pollInterval() > QDateTime::currentMSecsSinceEpoch())
+        if (device->polling() || device->pollTime() + device->pollInterval() > QDateTime::currentSecsSinceEpoch())
             continue;
 
         device->poll();
